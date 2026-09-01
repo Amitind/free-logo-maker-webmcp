@@ -24,18 +24,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { copyLayerToClipboard, getClipboardLayer } from '@/lib/layer-clipboard';
 import {
 	buildCandidate,
+	CURATED_ALL_SUGGESTED_ICONS,
 	fetchLogoIcons,
 	ICON_API_URL,
 	iconUrl,
 	LOGO_PACKS,
 	PALETTES,
 	packOf,
+	pickCandidates,
+	randomCandidateStyle,
+	shuffle,
 	sortByLogoPack,
 	useApplyCandidate,
 } from '@/lib/logo-icons';
 import { BRAND_PRESETS } from '@/lib/logo-presets';
 import { buildShareUrl, decodeLogo, encodeLogo } from '@/lib/logo-share';
-import { listLogos, saveLogo, svgToDataUri } from '@/lib/my-logos';
+import { listLogos, removeLogo, saveLogo, svgToDataUri } from '@/lib/my-logos';
 import type {
 	AnimationType,
 	BackgroundConfig,
@@ -93,7 +97,9 @@ declare global {
 
 const DEFAULT_CANVAS_SIZE = { width: 512, height: 512 };
 
-const buildAgentPrompt = (pageUrl: string) => `I want a logo. Before you design anything, ask me a few short questions: the brand or product name, what it does, the mood (minimal, playful, bold, corporate), colors I like or must avoid, and any symbol I already have in mind.
+const buildAgentPrompt = (
+	pageUrl: string,
+) => `I want a logo. Before you design anything: if you're already working in a project (a codebase, an existing site, prior branding, things I've told you before), pull the brand/product name, what it does, colors, and tone directly from that instead of asking me. Only ask me for what you genuinely can't infer. For mood, don't hand me a generic fixed list, propose 2-3 mood options that actually fit what you already know about the brand and audience, and let me pick or correct. Also ask for colors I like or must avoid and any symbol I already have in mind, unless you already know them.
 
 Then open ${pageUrl} in the browser. Its WebMCP tools follow the standard document.modelContext API: registerTool, getTools() (async, resolves to an array of {name, description, inputSchema}, inputSchema is a JSON string, parse it), and executeTool(tool, argsJsonString) (first arg is the tool object from getTools(), not its name; second arg is a JSON string of the arguments, not an object; it resolves to a JSON string too). If you have a JS execution tool, run this once and reuse it for every call instead of guessing the calling convention yourself:
 const mc = document.modelContext;
@@ -107,7 +113,7 @@ If your runtime already discovers and calls document.modelContext tools natively
 
 1. Call get_logo_maker_state first. It returns the canvas, the brand presets and the layer fields.
 2. Search the icon library with search_logo_icons before drawing anything custom. Only fall back to customSvg when no icon fits.
-3. Build with update_logo_maker_state. Layer x/y are pixels on the canvas (0 to canvasSize.width/height, canvas center is canvasSize.width / 2), not a 0-100 percent scale; omit them to keep the default centered position. Then check safeZoneViolations and lowContrastLayers in the response and fix them.
+3. Build with update_logo_maker_state. Layer x/y are a 0-100 percentage of canvas width/height (50, 50 is always dead center, regardless of canvas size); omit them to keep the default centered position. Then check safeZoneViolations and lowContrastLayers in the response and fix them (lowContrastLayers checks against the flat background only, so a layer deliberately nested inside another opaque layer can be ignored).
 4. Make three clearly different variants (different symbol, shape or palette, not the same logo recoloured). After each one, preview it with get_logo_preview (format: "svg") and save it as a checkpoint with manage_saved_logos (action: "save") so I can click between them in the My logos panel.
 5. Tell me which variant you would pick and why, with the shareUrl from get_logo_maker_state for each.
 6. Before you finish, call send_feedback once with one or two sentences on anything you had to guess, retry, or found confusing while driving these tools, and what would have made it clearer. Skip it only if nothing tripped you up.
@@ -160,12 +166,12 @@ const layerItemSchema = {
 		x: {
 			type: 'number',
 			description:
-				'Canvas horizontal position in pixels, from the left edge. Canvas center is canvasSize.width / 2 (256 for the default 512x512 canvas), not a percentage.',
+				'Horizontal position as a percentage (0-100) of canvas width, from the left edge. 50 is always center, on any canvas size. Omit to default to 50 (center).',
 		},
 		y: {
 			type: 'number',
 			description:
-				'Canvas vertical position in pixels, from the top edge. Canvas center is canvasSize.height / 2 (256 for the default 512x512 canvas), not a percentage.',
+				'Vertical position as a percentage (0-100) of canvas height, from the top edge. 50 is always center, on any canvas size. Omit to default to 50 (center).',
 		},
 		scale: {
 			type: 'number',
@@ -314,7 +320,8 @@ const backgroundSchema = {
 		},
 		borderRadius: {
 			type: 'number',
-			description: 'Corner radius in pixels.',
+			description:
+				'Corner radius in pixels, clamped to >=0 (no fixed max). Only affects shape: "rectangle". Ignored when shape is "circle" or "squircle": those always use a full round/squircle clip regardless of this value.',
 		},
 		pattern: {
 			type: 'string',
@@ -465,12 +472,12 @@ const updateLayerItemSchema = {
 		x: {
 			type: 'number',
 			description:
-				'Canvas horizontal position in pixels, from the left edge. Canvas center is canvasSize.width / 2 (256 for the default 512x512 canvas), not a percentage.',
+				'Horizontal position as a percentage (0-100) of canvas width, from the left edge. 50 is always center, on any canvas size. Omit to default to 50 (center).',
 		},
 		y: {
 			type: 'number',
 			description:
-				'Canvas vertical position in pixels, from the top edge. Canvas center is canvasSize.height / 2 (256 for the default 512x512 canvas), not a percentage.',
+				'Vertical position as a percentage (0-100) of canvas height, from the top edge. 50 is always center, on any canvas size. Omit to default to 50 (center).',
 		},
 		scale: {
 			type: 'number',
@@ -581,7 +588,7 @@ const updateLogoStateSchema = {
 		applyBrand: {
 			type: 'string',
 			description:
-				'Apply an authentic real-world brand preset style (e.g. "instagram", "facebook", "spotify", "duolingo", "youtube", "whatsapp", "discord", "stripe", "linear", "supabase", "raycast", "netflix", "apple", "github", "google", "figma", "airbnb", "twitch", "slack").',
+				'Apply an authentic real-world brand preset\'s background/style only (color, gradient, shape, pattern, border radius) (e.g. "instagram", "facebook", "spotify", "duolingo", "youtube", "whatsapp", "discord", "stripe", "linear", "supabase", "raycast", "netflix", "apple", "github", "google", "figma", "airbnb", "twitch", "slack"). Does not add, remove, or recolor any icon layer, existing layers are left exactly as they are: follow it with updateLayers to set the icon/fill yourself, or use load_logo_maker_share\'s brand argument instead if you want the complete pre-built brand logo (background and matching icon layer) loaded in one step.',
 		},
 		showSafeZone: {
 			type: 'boolean',
@@ -663,6 +670,21 @@ const searchIconsSchema = {
 	required: ['query'],
 } as const;
 
+const suggestLogoIconsSchema = {
+	type: 'object',
+	properties: {
+		keyword: {
+			type: 'string',
+			description:
+				'Optional theme keyword (e.g. "coffee", "fitness", "tech") to bias suggestions toward. Omit for a shuffle of the curated all-purpose icon pool, matching the UI\'s "Shuffle" button.',
+		},
+		count: {
+			type: 'number',
+			description: 'Number of candidates to return (default 6, max 12).',
+		},
+	},
+} as const;
+
 const loadShareSchema = {
 	type: 'object',
 	properties: {
@@ -705,13 +727,13 @@ const manageSavedLogosSchema = {
 	properties: {
 		action: {
 			type: 'string',
-			enum: ['list', 'load', 'save'],
+			enum: ['list', 'load', 'save', 'delete'],
 			description:
-				'"list" returns the saved logos in this browser\'s "My logos" panel. "load" replaces the current editor state with a saved logo by id (requires id). "save" saves the current editor state as a new saved logo, visible in the human "My logos" panel too.',
+				'"list" returns the saved logos in this browser\'s "My logos" panel. "load" replaces the current editor state with a saved logo by id (requires id). "save" saves the current editor state as a new saved logo, visible in the human "My logos" panel too. "delete" removes a saved logo by id (requires id).',
 		},
 		id: {
 			type: 'string',
-			description: 'Saved logo ID. Required for action "load".',
+			description: 'Saved logo ID. Required for action "load" and "delete".',
 		},
 	},
 	required: ['action'],
@@ -752,8 +774,13 @@ const computeLayerBounds = (
 	};
 };
 
-const toSharedLayer = ({ id: _id, url: _url, ...layer }: LogoLayer) => ({
+const toSharedLayer = (
+	{ id: _id, url: _url, ...layer }: LogoLayer,
+	canvasSize: { width: number; height: number },
+) => ({
 	...layer,
+	x: pixelToPercent(layer.x, canvasSize.width),
+	y: pixelToPercent(layer.y, canvasSize.height),
 	bounds: computeLayerBounds(layer),
 });
 
@@ -891,6 +918,16 @@ const patchBackground = (
 	return next;
 };
 
+// Layer x/y are stored internally as canvas pixels (rendering, safe-zone math,
+// and saved/shared logo codes all depend on this), but the WebMCP-facing tools
+// speak in 0-100 percent of canvas width/height, matching every other
+// position-like field (radialCenterX/Y, gradientPositions): 50 always means
+// "center" regardless of canvas size, which is what an agent already expects.
+const percentToPixel = (percent: number, extent: number) =>
+	(percent / 100) * extent;
+const pixelToPercent = (pixel: number, extent: number) =>
+	extent === 0 ? 50 : (pixel / extent) * 100;
+
 const createLayer = (
 	rawLayer: Record<string, unknown>,
 	canvasSize: { width: number; height: number },
@@ -911,8 +948,8 @@ const createLayer = (
 			typeof rawLayer.customSvg === 'string' && rawLayer.customSvg.trim()
 				? rawLayer.customSvg.trim()
 				: undefined,
-		x: asNumber(rawLayer.x, canvasSize.width / 2),
-		y: asNumber(rawLayer.y, canvasSize.height / 2),
+		x: percentToPixel(asNumber(rawLayer.x, 50), canvasSize.width),
+		y: percentToPixel(asNumber(rawLayer.y, 50), canvasSize.height),
 		scale: asNumber(rawLayer.scale, 1.6),
 		scaleY:
 			typeof rawLayer.scaleY === 'number' &&
@@ -992,6 +1029,7 @@ const createLayer = (
 const patchLayer = (
 	layer: LogoLayer,
 	patch: Record<string, unknown>,
+	canvasSize: { width: number; height: number },
 ): LogoLayer => {
 	const next = { ...layer };
 	if (
@@ -1010,8 +1048,10 @@ const patchLayer = (
 	if (typeof patch.customSvg === 'string') {
 		next.customSvg = patch.customSvg.trim() ? patch.customSvg : undefined;
 	}
-	if (typeof patch.x === 'number' && Number.isFinite(patch.x)) next.x = patch.x;
-	if (typeof patch.y === 'number' && Number.isFinite(patch.y)) next.y = patch.y;
+	if (typeof patch.x === 'number' && Number.isFinite(patch.x))
+		next.x = percentToPixel(patch.x, canvasSize.width);
+	if (typeof patch.y === 'number' && Number.isFinite(patch.y))
+		next.y = percentToPixel(patch.y, canvasSize.height);
 	if (typeof patch.scale === 'number' && Number.isFinite(patch.scale))
 		next.scale = patch.scale;
 	if (patch.scaleY === null) {
@@ -1673,7 +1713,7 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 							name: 'get_logo_maker_state',
 							title: 'Get logo maker state',
 							description:
-								'Start here. Before designing, ask the human what they want: brand or product name, preferred colors, style (minimal, playful, bold, corporate), and any icon or symbol in mind. Do not guess these from nothing, and do not interrogate with a long fixed questionnaire either, just enough to design with intent. Then call this tool to read the current logo-maker canvas size, background, layers (with IDs and indices), selected layer, safe zone settings, available brands list, safeZoneViolations, lowContrastLayers (checked against the flat canvas background only, not other layers stacked underneath, so a low-contrast reading on a layer deliberately used as a cutout/notch against another layer is expected and can be ignored), share code, and share URL. Each layer includes a computed bounds field (width, height, left, top, right, bottom, centerX, centerY, rotation, all in canvas pixels) so you can check overlap or alignment against other layers or the canvas edges without guessing from x/y/scale. Pass includeSvg: true to also receive the rendered SVG string, includeBrands: true for the full brand presets catalog (optionally narrowed with brandsQuery/brandsCategory), or includeTemplates: true for the built-in templates catalog.',
+								"Start here. Before designing, ask the human what they want: brand or product name, preferred colors, style (minimal, playful, bold, corporate), and any icon or symbol in mind. Do not guess these from nothing, and do not interrogate with a long fixed questionnaire either, just enough to design with intent. Then call this tool to read the current logo-maker canvas size, background, layers (with IDs and indices), selected layer, safe zone settings, available brands list, safeZoneViolations, lowContrastLayers (checked against the flat canvas background only, not other layers stacked underneath, so a low-contrast reading on a layer deliberately used as a cutout/notch against another layer is expected and can be ignored), share code, and share URL. Each layer's x/y is a 0-100 percentage of canvas width/height (50 is always center); it also includes a computed bounds field (width, height, left, top, right, bottom, centerX, centerY, rotation, all in canvas pixels, the pixel equivalent of x/y/scale) so you can check overlap or alignment against other layers or the canvas edges without converting yourself. Pass includeSvg: true to also receive the rendered SVG string, includeBrands: true for the full brand presets catalog (optionally narrowed with brandsQuery/brandsCategory), or includeTemplates: true for the built-in templates catalog.",
 							annotations: { readOnlyHint: true },
 							inputSchema: getLogoStateSchema,
 							async execute(args: Record<string, unknown> = {}) {
@@ -1725,7 +1765,7 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 									layers: current.layers.map((l, index) => ({
 										id: l.id,
 										index,
-										...toSharedLayer(l),
+										...toSharedLayer(l, current.canvasSize),
 									})),
 									selectedLayerId: current.selectedLayerId,
 									showSafeZone: current.showSafeZone,
@@ -1772,9 +1812,18 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 							name: 'update_logo_maker_state',
 							title: 'Update logo maker state',
 							description:
-								'Smart partial editor updates: modifies background, applies authentic brand presets (e.g. "instagram", "facebook", "spotify", "stripe", "linear", "supabase"), toggles safe zone keylines, adds new layers, updates existing layers (by ID or 0-based index), removes layers, clears layers, randomizes the whole design, or updates selection without needing to re-send the whole state. updateLayers patches only the fields you send on the targeted layer: every other field, including fill/stroke colors, is left untouched; if a targeted update doesn\'t match any layer, it\'s listed in the response\'s unmatchedUpdates field instead of silently doing nothing, and an invalid enum value (e.g. fillType outside "solid"/"linear"/"radial", "gradient" is not a value) is reported in the response\'s fieldWarnings field instead of silently being dropped. This is the tool to use for toggling overwriteFill/overwriteStroke on or off without losing a previously set color, or any other incremental tweak; use replace_logo_maker_state only when loading a complete logo from scratch. For a gradient icon set fillType: "linear" or "radial" with fillStops (and overwriteFill: true) rather than writing customSvg. For a non-square shape (a band, a bar, a stretched mark) set scaleY on the layer instead of composing several layers. For a two-tone or four-colour block background set background.type: "split" with splitLayout and gradientColors. A centered layer\'s on-canvas footprint is roughly 200 * scale square; to stay inside the safe-zone circle (radius = canvasSize.width * safeZoneRatio / 2) a centered layer needs scale under (canvasSize.width * safeZoneRatio) / 283 (about 1.1 on the default 512px canvas at the default 0.611 ratio) — new layers default to scale 1.6, a bold full-bleed size that intentionally exceeds this, shrink it if safeZoneViolations flags it and a tight circular app-icon crop matters.',
+								'Smart partial editor updates: modifies background, applies authentic brand presets\' background/style only, no icon layer (e.g. "instagram", "facebook", "spotify", "stripe", "linear", "supabase"; see applyBrand\'s own description), toggles safe zone keylines, adds new layers, updates existing layers (by ID or 0-based index), removes layers, clears layers, randomizes the whole design, or updates selection without needing to re-send the whole state. updateLayers patches only the fields you send on the targeted layer: every other field, including fill/stroke colors, is left untouched; if a targeted update doesn\'t match any layer, it\'s listed in the response\'s unmatchedUpdates field instead of silently doing nothing, and an invalid enum value (e.g. fillType outside "solid"/"linear"/"radial", "gradient" is not a value) is reported in the response\'s fieldWarnings field instead of silently being dropped. Top-level args this tool doesn\'t recognize (e.g. sending get_logo_maker_state\'s "layers" array here instead of addLayers/updateLayers) are listed in the response\'s unrecognizedArgs field rather than silently no-opping. The response also includes safeZoneViolations and lowContrastLayers (same checks as get_logo_maker_state) so you can check and fix them without an extra round trip. This is the tool to use for toggling overwriteFill/overwriteStroke on or off without losing a previously set color, or any other incremental tweak; use replace_logo_maker_state only when loading a complete logo from scratch. For a gradient icon set fillType: "linear" or "radial" with fillStops (and overwriteFill: true) rather than writing customSvg. For a non-square shape (a band, a bar, a stretched mark) set scaleY on the layer instead of composing several layers. For a two-tone or four-colour block background set background.type: "split" with splitLayout and gradientColors. A centered layer\'s on-canvas footprint is roughly 200 * scale square; to stay inside the safe-zone circle (radius = canvasSize.width * safeZoneRatio / 2) a centered layer needs scale under (canvasSize.width * safeZoneRatio) / 283 (about 1.1 on the default 512px canvas at the default 0.611 ratio) — new layers default to scale 1.6, a bold full-bleed size that intentionally exceeds this, shrink it if safeZoneViolations flags it and a tight circular app-icon crop matters.',
 							inputSchema: updateLogoStateSchema,
 							async execute(args: Record<string, unknown> = {}) {
+								// A key that isn't in the schema (e.g. sending get_logo_maker_state's
+								// `layers` shape here instead of `addLayers`/`updateLayers`) is a
+								// no-op, not an error: surface it instead of silently doing nothing.
+								const knownArgKeys = new Set(
+									Object.keys(updateLogoStateSchema.properties),
+								);
+								const unrecognizedArgs = Object.keys(args).filter(
+									(key) => !knownArgKeys.has(key),
+								);
 								const current = stateRef.current;
 								const nextCanvas = patchCanvas(
 									current.canvasSize,
@@ -1821,6 +1870,11 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 								if (typeof args.showDesignGrid === 'boolean') {
 									setShowDesignGrid(args.showDesignGrid);
 								}
+								const effectiveSafeZoneRatio =
+									typeof args.safeZoneRatio === 'number' &&
+									Number.isFinite(args.safeZoneRatio)
+										? Math.max(0.2, Math.min(0.98, args.safeZoneRatio))
+										: current.safeZoneRatio;
 								if (
 									typeof args.safeZoneRatio === 'number' &&
 									Number.isFinite(args.safeZoneRatio)
@@ -1910,6 +1964,7 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 											nextLayers[foundIdx] = patchLayer(
 												nextLayers[foundIdx],
 												update,
+												nextCanvas,
 											);
 											touchedLayerIds.push(nextLayers[foundIdx].id);
 										} else {
@@ -2018,13 +2073,24 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 									layers: nextLayers.map((l, index) => ({
 										id: l.id,
 										index,
-										...toSharedLayer(l),
+										...toSharedLayer(l, nextCanvas),
 									})),
 									layerCount: nextLayers.length,
 									unmatchedUpdates:
 										unmatchedUpdates.length > 0 ? unmatchedUpdates : undefined,
 									fieldWarnings:
 										fieldWarnings.length > 0 ? fieldWarnings : undefined,
+									unrecognizedArgs:
+										unrecognizedArgs.length > 0 ? unrecognizedArgs : undefined,
+									safeZoneViolations: computeSafeZoneViolations(
+										nextLayers,
+										nextCanvas,
+										effectiveSafeZoneRatio,
+									),
+									lowContrastLayers: computeLowContrastLayers(
+										nextLayers,
+										nextBg,
+									),
 									randomKeyword,
 									palette: randomPalette,
 									shareCode: code,
@@ -2043,9 +2109,10 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 							name: 'replace_logo_maker_state',
 							title: 'Replace logo maker state',
 							description:
-								'Replaces the entire editor contents with a structured logo state (canvasSize, background, and layers array) and returns a share code, share URL, and optional SVG. Full replace: any layer field you omit reverts to its default, it does not carry over from the current state. For any incremental edit (including toggling overwriteFill/overwriteStroke without losing the stored color) use update_logo_maker_state\'s updateLayers instead, which patches only the fields you send. Reserve this tool for loading a complete, fully-specified logo from scratch. For a gradient icon set fillType: "linear" or "radial" with fillStops (and overwriteFill: true) rather than writing customSvg.',
+								'Replaces the entire editor contents with a structured logo state (canvasSize, background, and layers array) and returns a share code, share URL, safeZoneViolations, lowContrastLayers, and optional SVG. Full replace: any layer field you omit reverts to its default, it does not carry over from the current state. For any incremental edit (including toggling overwriteFill/overwriteStroke without losing the stored color) use update_logo_maker_state\'s updateLayers instead, which patches only the fields you send. Reserve this tool for loading a complete, fully-specified logo from scratch. For a gradient icon set fillType: "linear" or "radial" with fillStops (and overwriteFill: true) rather than writing customSvg.',
 							inputSchema: replaceLogoStateSchema,
 							async execute(args: Record<string, unknown> = {}) {
+								const current = stateRef.current;
 								const nextState = normalizeLogoState(args);
 								setCanvasSize(nextState.canvasSize);
 								setBackground(nextState.background);
@@ -2057,18 +2124,30 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 								if (typeof args.showDesignGrid === 'boolean') {
 									setShowDesignGrid(args.showDesignGrid);
 								}
+								const effectiveSafeZoneRatio =
+									typeof args.safeZoneRatio === 'number' &&
+									Number.isFinite(args.safeZoneRatio)
+										? Math.max(0.2, Math.min(0.98, args.safeZoneRatio))
+										: current.safeZoneRatio;
 								if (
 									typeof args.safeZoneRatio === 'number' &&
 									Number.isFinite(args.safeZoneRatio)
 								) {
-									setSafeZoneRatio(
-										Math.max(0.2, Math.min(0.98, args.safeZoneRatio)),
-									);
+									setSafeZoneRatio(effectiveSafeZoneRatio);
 								}
 								const code = await encodeLogo(nextState);
 								return {
 									ok: true,
 									layerCount: nextState.layers.length,
+									safeZoneViolations: computeSafeZoneViolations(
+										nextState.layers,
+										nextState.canvasSize,
+										effectiveSafeZoneRatio,
+									),
+									lowContrastLayers: computeLowContrastLayers(
+										nextState.layers,
+										nextState.background,
+									),
 									shareCode: code,
 									shareUrl: buildShareUrl(code),
 									svg: args.includeSvg
@@ -2156,6 +2235,56 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 
 					registerTool(
 						{
+							name: 'suggest_logo_icons',
+							title: 'Suggest logo icons',
+							description:
+								'Returns ready-to-apply candidate logos (one curated icon each, paired with a brand-grade palette and shape) the same way the UI\'s "Generate"/"Shuffle" panel does. Read-only: it does not change the canvas. To apply a candidate, pass its exact layers, background, and canvasSize to replace_logo_maker_state.',
+							annotations: { readOnlyHint: true },
+							inputSchema: suggestLogoIconsSchema,
+							async execute(args: Record<string, unknown> = {}) {
+								const keyword = asString(args.keyword, '').trim();
+								const count = Math.min(
+									Math.max(asNumber(args.count, 6), 1),
+									12,
+								);
+								const icons = keyword
+									? await pickCandidates(keyword, count, controller.signal)
+									: shuffle(CURATED_ALL_SUGGESTED_ICONS).slice(0, count);
+								const current = stateRef.current;
+								const candidates = icons.map((icon) => {
+									// ponytail: skips the UI's current-canvas colour bias
+									// (contextualCandidateStyle); a random palette per
+									// candidate is enough variety for an agent to choose from.
+									const style = randomCandidateStyle();
+									return buildCandidate(
+										icon,
+										current.canvasSize,
+										style.paletteIndex,
+										style.shape,
+									);
+								});
+								return {
+									ok: true,
+									keyword: keyword || undefined,
+									candidates: candidates.map((c, index) => ({
+										index,
+										palette: c.palette,
+										background: c.background,
+										canvasSize: current.canvasSize,
+										layers: c.layers.map((l, layerIndex) => ({
+											id: l.id,
+											index: layerIndex,
+											...toSharedLayer(l, current.canvasSize),
+										})),
+									})),
+								};
+							},
+						},
+						{ signal: controller.signal },
+					),
+
+					registerTool(
+						{
 							name: 'load_logo_maker_share',
 							title: 'Load logo maker share, brand or template',
 							description:
@@ -2231,7 +2360,7 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 										layers: nextLayers.map((l, index) => ({
 											id: l.id,
 											index,
-											...toSharedLayer(l),
+											...toSharedLayer(l, nextCanvas),
 										})),
 										layerCount: nextLayers.length,
 										shareCode: code,
@@ -2281,7 +2410,7 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 										layers: nextLayers.map((l, index) => ({
 											id: l.id,
 											index,
-											...toSharedLayer(l),
+											...toSharedLayer(l, nextCanvas),
 										})),
 										layerCount: nextLayers.length,
 										shareCode: code,
@@ -2313,7 +2442,7 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 									layers: nextState.layers.map((l, index) => ({
 										id: l.id,
 										index,
-										...toSharedLayer(l),
+										...toSharedLayer(l, nextState.canvasSize),
 									})),
 									shareCode: code,
 									shareUrl: buildShareUrl(code),
@@ -2368,7 +2497,7 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 							name: 'manage_saved_logos',
 							title: 'Manage saved logos',
 							description:
-								'Reads and writes the "My logos" list (the same browser-local list the human Save/My-logos UI uses). action: "list" returns saved entries (id, code, savedAt, iconName, thumb). action: "load" replaces the current editor state with a saved entry by id. action: "save" saves the current editor state as a new entry, so agent-built logos show up in the human "My logos" panel too.',
+								'Reads and writes the "My logos" list (the same browser-local list the human Save/My-logos UI uses). action: "list" returns saved entries (id, code, savedAt, iconName, thumb). action: "load" replaces the current editor state with a saved entry by id. action: "save" saves the current editor state as a new entry, so agent-built logos show up in the human "My logos" panel too. action: "delete" removes a saved entry by id.',
 							inputSchema: manageSavedLogosSchema,
 							async execute(args: Record<string, unknown> = {}) {
 								const action = asString(args.action, '');
@@ -2400,7 +2529,7 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 										layers: nextState.layers.map((l, index) => ({
 											id: l.id,
 											index,
-											...toSharedLayer(l),
+											...toSharedLayer(l, nextState.canvasSize),
 										})),
 										shareCode: entry.code,
 										shareUrl: buildShareUrl(entry.code),
@@ -2434,7 +2563,21 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 									return { ok: true, logos };
 								}
 
-								throw new Error('action must be "list", "load", or "save".');
+								if (action === 'delete') {
+									const id = asString(args.id, '').trim();
+									if (!id) {
+										throw new Error('id is required for action "delete".');
+									}
+									if (!listLogos().some((logo) => logo.id === id)) {
+										throw new Error(`No saved logo found with id "${id}".`);
+									}
+									const logos = removeLogo(id);
+									return { ok: true, logos };
+								}
+
+								throw new Error(
+									'action must be "list", "load", "save", or "delete".',
+								);
 							},
 						},
 						{ signal: controller.signal },
