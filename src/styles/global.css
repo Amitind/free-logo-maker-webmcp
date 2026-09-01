@@ -1,0 +1,315 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+	/* Radius: maps rounded.md (8px) so sm=4px xs, md=6px sm, lg=8px md, xl=12px lg */
+	--radius: 0.5rem;
+
+	/* shadcn surface tokens → DESIGN.md palette */
+	--background: oklch(0.985 0 0); /* canvas-soft #fafafa */
+	--foreground: oklch(0.141 0.005 285.823); /* ink #171717 */
+	--card: oklch(1 0 0); /* canvas #ffffff */
+	--card-foreground: oklch(0.141 0.005 285.823);
+	--popover: oklch(1 0 0);
+	--popover-foreground: oklch(0.141 0.005 285.823);
+	--primary: oklch(0.141 0.005 285.823); /* ink #171717: the single black CTA */
+	--primary-foreground: oklch(1 0 0); /* on-primary #ffffff */
+	--secondary: oklch(0.967 0.001 286.375); /* canvas-soft-2 #f5f5f5 */
+	--secondary-foreground: oklch(0.141 0.005 285.823);
+	--muted: oklch(0.967 0.001 286.375); /* canvas-soft-2 #f5f5f5 */
+	--muted-foreground: oklch(0.365 0 0); /* body #4d4d4d */
+	--accent: oklch(0.967 0.001 286.375); /* canvas-soft-2 #f5f5f5 */
+	--accent-foreground: oklch(0.141 0.005 285.823);
+	--destructive: oklch(0.55 0.26 27); /* error #ee0000 */
+	--border: oklch(0.93 0 0); /* hairline #ebebeb */
+	--input: oklch(0.93 0 0);
+	--ring: oklch(0.141 0.005 285.823); /* ink */
+	--chart-1: oklch(0.546 0.218 255); /* link #0070f3 */
+	--chart-2: oklch(0.55 0.26 27); /* error #ee0000 */
+	--chart-3: oklch(0.62 0.22 305); /* violet #7928ca */
+	--chart-4: oklch(0.82 0.15 168); /* cyan #50e3c2 */
+	--chart-5: oklch(0.75 0.18 48); /* warning #f5a623 */
+	--sidebar: oklch(1 0 0); /* canvas #ffffff */
+	--sidebar-foreground: oklch(0.141 0.005 285.823);
+	--sidebar-primary: oklch(0.141 0.005 285.823);
+	--sidebar-primary-foreground: oklch(1 0 0);
+	--sidebar-accent: oklch(0.967 0.001 286.375);
+	--sidebar-accent-foreground: oklch(0.141 0.005 285.823);
+	--sidebar-border: oklch(0.93 0 0);
+	--sidebar-ring: oklch(0.141 0.005 285.823);
+
+	/* DESIGN.md named color tokens */
+	--ds-ink: #171717;
+	--ds-body: #4d4d4d;
+	--ds-mute: #888888;
+	--ds-hairline: #ebebeb;
+	--ds-hairline-strong: #a1a1a1;
+	--ds-canvas: #ffffff;
+	--ds-canvas-soft: #fafafa;
+	--ds-canvas-soft-2: #f5f5f5;
+	--ds-link: #0070f3;
+	--ds-link-deep: #0761d1;
+	--ds-link-bg-soft: #d3e5ff;
+	--ds-error: #ee0000;
+	--ds-error-soft: #f7d4d6;
+	--ds-error-deep: #c50000;
+	--ds-warning: #f5a623;
+	--ds-warning-soft: #ffefcf;
+	--ds-warning-deep: #ab570a;
+	--ds-violet: #7928ca;
+	--ds-cyan: #50e3c2;
+	--ds-highlight-pink: #ff0080;
+	--ds-gradient-develop-start: #007cf0;
+	--ds-gradient-develop-end: #00dfd8;
+	--ds-gradient-preview-start: #7928ca;
+	--ds-gradient-preview-end: #ff0080;
+	--ds-gradient-ship-start: #ff4d4d;
+	--ds-gradient-ship-end: #f9cb28;
+}
+
+.dark {
+	--background: oklch(0.09 0.005 285.823); /* ~#0a0a0a */
+	--foreground: oklch(0.985 0 0); /* #ffffff */
+	--card: oklch(0.141 0.005 285.823); /* ink #171717 */
+	--card-foreground: oklch(0.985 0 0);
+	--popover: oklch(0.141 0.005 285.823);
+	--popover-foreground: oklch(0.985 0 0);
+	--primary: oklch(0.985 0 0); /* white: reversed primary in dark */
+	--primary-foreground: oklch(0.141 0.005 285.823);
+	--secondary: oklch(0.21 0.006 285.885);
+	--secondary-foreground: oklch(0.985 0 0);
+	--muted: oklch(0.21 0.006 285.885);
+	--muted-foreground: oklch(0.67 0 0); /* hairline-strong #a1a1a1 */
+	--accent: oklch(0.21 0.006 285.885);
+	--accent-foreground: oklch(0.985 0 0);
+	--destructive: oklch(0.65 0.22 27);
+	--border: oklch(1 0 0 / 10%);
+	--input: oklch(1 0 0 / 12%);
+	--ring: oklch(0.985 0 0);
+	--chart-1: oklch(0.65 0.18 255);
+	--chart-2: oklch(0.65 0.22 27);
+	--chart-3: oklch(0.72 0.18 305);
+	--chart-4: oklch(0.85 0.12 168);
+	--chart-5: oklch(0.78 0.15 48);
+	--sidebar: oklch(0.141 0.005 285.823);
+	--sidebar-foreground: oklch(0.985 0 0);
+	--sidebar-primary: oklch(0.985 0 0);
+	--sidebar-primary-foreground: oklch(0.141 0.005 285.823);
+	--sidebar-accent: oklch(0.21 0.006 285.885);
+	--sidebar-accent-foreground: oklch(0.985 0 0);
+	--sidebar-border: oklch(1 0 0 / 10%);
+	--sidebar-ring: oklch(0.985 0 0);
+}
+
+@theme inline {
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-destructive-foreground: var(--destructive-foreground);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-chart-1: var(--chart-1);
+	--color-chart-2: var(--chart-2);
+	--color-chart-3: var(--chart-3);
+	--color-chart-4: var(--chart-4);
+	--color-chart-5: var(--chart-5);
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-ring: var(--sidebar-ring);
+
+	--font-sans: var(--font-sans);
+	--font-mono: var(--font-mono);
+	--font-serif: var(--font-serif);
+
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) + 4px);
+
+	--shadow-2xs: var(--shadow-2xs);
+	--shadow-xs: var(--shadow-xs);
+	--shadow-sm: var(--shadow-sm);
+	--shadow: var(--shadow);
+	--shadow-md: var(--shadow-md);
+	--shadow-lg: var(--shadow-lg);
+	--shadow-xl: var(--shadow-xl);
+	--shadow-2xl: var(--shadow-2xl);
+}
+@utility container {
+	@media (width >= --theme(--breakpoint-sm)) {
+		max-width: none;
+	}
+	@media (width >= 100%) {
+		max-width: 100%;
+	}
+	@media (width >= 56rem) {
+		max-width: 64rem;
+	}
+}
+/* used to wrap the container for dashed border */
+@utility container-wrapper {
+	@apply border-x mx-auto w-full max-w-[90rem] border-dashed;
+}
+
+@utility border-grid {
+	@apply border-dashed border-gray-950/5 border;
+}
+
+@utility preview-grid {
+	background-color: color-mix(in oklch, var(--background) 88%, var(--muted));
+	background-image:
+		linear-gradient(
+			to right,
+			color-mix(in oklch, var(--border) 80%, transparent) 1px,
+			transparent 1px
+		),
+		linear-gradient(
+			to bottom,
+			color-mix(in oklch, var(--border) 80%, transparent) 1px,
+			transparent 1px
+		);
+	background-position: center;
+	background-size: 12px 12px;
+}
+
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+	body {
+		@apply bg-background text-foreground;
+	}
+	.container {
+		padding-inline: 1rem;
+		margin-inline: auto;
+	}
+
+	/* Modern scrollbar styling */
+	::-webkit-scrollbar {
+		@apply h-2 w-2;
+	}
+
+	::-webkit-scrollbar-track {
+		@apply bg-transparent;
+	}
+
+	::-webkit-scrollbar-thumb {
+		@apply rounded-full bg-border transition-colors hover:bg-muted-foreground/50;
+	}
+
+	/* For Firefox */
+	* {
+		scrollbar-color: hsl(var(--border)) transparent;
+		scrollbar-width: thin;
+	}
+
+	/* Astro Code component consistent padding */
+	.astro-code {
+		@apply p-4 rounded-lg text-sm leading-relaxed;
+	}
+}
+
+/* Marquee animation: used by homepage icon strip via animate-marquee utility */
+@keyframes marquee {
+	from {
+		transform: translateX(0);
+	}
+	to {
+		transform: translateX(-50%);
+	}
+}
+
+@utility animate-marquee {
+	animation: marquee 60s linear infinite;
+	will-change: transform;
+}
+
+/* Hydration fade: client:only islands appearing over their static fallback */
+@keyframes fade-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@utility animate-fade-in {
+	animation: fade-in 200ms cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+/* Logo maker per-layer motion: applied inline via style={{ animation: ... }}
+   on a nested wrapper inside each layer (LogoCanvas.tsx), never on the
+   outer positioned layer div, so it composes with (doesn't clobber) that
+   div's own static translate/rotate transform. */
+@keyframes logo-layer-rotate {
+	0% {
+		transform: rotate(0deg);
+	}
+	100% {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes logo-layer-float {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-4px);
+	}
+}
+
+@keyframes logo-layer-pulse {
+	0%,
+	100% {
+		transform: scale(1);
+	}
+	50% {
+		transform: scale(1.04);
+	}
+}
+
+@keyframes logo-layer-sway {
+	0%,
+	100% {
+		transform: rotate(-3deg);
+	}
+	50% {
+		transform: rotate(3deg);
+	}
+}
+
+/* Respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}

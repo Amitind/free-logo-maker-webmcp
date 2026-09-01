@@ -1,0 +1,28 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import WebMcp from '@/components/common/WebMcp.astro';
+import { LogoMaker } from '@/components/LogoMaker';
+---
+
+<Layout
+	title="Free Logo Maker — WebMCP Demo"
+	description="Free SVG logo editor with WebMCP tools an AI agent can drive directly, built for the OpenAI WebMCP Challenge."
+>
+	<WebMcp />
+	<main class="flex-1">
+		<LogoMaker client:load totalIconsLabel="200,000+" />
+	</main>
+	<footer class="border-t border-border py-4 text-center text-sm text-muted-foreground">
+		<p>
+			Full version with more presets & guides &rarr;{' '}
+			<a
+				href="https://allsvgicons.com/free-logo-maker/"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="underline hover:text-foreground transition-colors"
+			>
+				allsvgicons.com/free-logo-maker/
+			</a>
+		</p>
+	</footer>
+</Layout>

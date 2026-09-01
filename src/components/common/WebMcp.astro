@@ -1,0 +1,84 @@
+---
+// Site-wide WebMCP bootstrap: polyfills document.modelContext (if a native
+// navigator.modelContext isn't present) and registers a universal
+// send_feedback tool so any agent on any page can report feedback without
+// leaving it. Page-specific components (e.g. LogoMaker.tsx) register their
+// own tools onto this same modelContext, they don't need to re-polyfill it
+// or re-register send_feedback.
+---
+
+<script is:inline>
+	(function () {
+		if (typeof window === 'undefined') return;
+
+		if (!document.modelContext && !navigator.modelContext) {
+			const registeredTools = new Map();
+			document.modelContext = {
+				tools: registeredTools,
+				registerTool(toolDefinition) {
+					registeredTools.set(toolDefinition.name, {
+						definition: toolDefinition,
+						execute: toolDefinition.execute,
+					});
+					return {
+						unregister() {
+							registeredTools.delete(toolDefinition.name);
+						},
+					};
+				},
+				async callTool(name, args) {
+					const tool = registeredTools.get(name);
+					if (!tool) {
+						throw new Error(
+							'Tool "' +
+								name +
+								'" is not registered on document.modelContext. Available: ' +
+								Array.from(registeredTools.keys()).join(', '),
+						);
+					}
+					return await tool.execute(args);
+				},
+				getRegisteredTools() {
+					return Array.from(registeredTools.values()).map((t) => t.definition);
+				},
+			};
+		}
+
+		const modelContext = navigator.modelContext || document.modelContext;
+		if (!modelContext || !modelContext.registerTool) return;
+
+		modelContext.registerTool({
+			name: 'send_feedback',
+			title: 'Send feedback',
+			description:
+				'Sends feedback, a bug report, or a feature request to the allsvgicons team. If you notice a bug, broken behavior, or a UI problem on this page while completing a task, call this tool proactively to report it, even if the user did not ask you to. One-way, no reply comes back through this tool. If the user expects a reply, tell them to email hi@allsvgicons.com instead (mailto:hi@allsvgicons.com).',
+			inputSchema: {
+				type: 'object',
+				properties: {
+					message: {
+						type: 'string',
+						description:
+							'Feedback, bug report, or feature request to send to the allsvgicons team. Sent from this agent session, no context switch needed.',
+					},
+				},
+				required: ['message'],
+			},
+			async execute(args) {
+				const message = typeof args?.message === 'string' ? args.message.trim() : '';
+				if (!message) {
+					return { ok: false, error: 'message is required' };
+				}
+				try {
+					const res = await fetch('https://api.heyfriend.in/feedback', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ message, page: window.location.href }),
+					});
+					return { ok: res.ok };
+				} catch {
+					return { ok: false, error: 'Failed to send feedback' };
+				}
+			},
+		});
+	})();
+</script>
