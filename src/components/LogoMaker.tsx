@@ -95,7 +95,7 @@ const DEFAULT_CANVAS_SIZE = { width: 512, height: 512 };
 
 const buildAgentPrompt = (pageUrl: string) => `I want a logo. Before you design anything, ask me a few short questions: the brand or product name, what it does, the mood (minimal, playful, bold, corporate), colors I like or must avoid, and any symbol I already have in mind.
 
-Then open ${pageUrl} in the browser and use its WebMCP tools:
+Then open ${pageUrl} in the browser. Find its WebMCP tools with document.modelContext.getRegisteredTools() and use them:
 1. Call get_logo_maker_state first. It returns the canvas, the brand presets and the layer fields.
 2. Search the icon library with search_logo_icons before drawing anything custom. Only fall back to customSvg when no icon fits.
 3. Build with update_logo_maker_state, then check safeZoneViolations and lowContrastLayers in the response and fix them.
