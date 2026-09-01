@@ -1772,7 +1772,7 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 							name: 'update_logo_maker_state',
 							title: 'Update logo maker state',
 							description:
-								'Smart partial editor updates: modifies background, applies authentic brand presets (e.g. "instagram", "facebook", "spotify", "stripe", "linear", "supabase"), toggles safe zone keylines, adds new layers, updates existing layers (by ID or 0-based index), removes layers, clears layers, randomizes the whole design, or updates selection without needing to re-send the whole state. updateLayers patches only the fields you send on the targeted layer: every other field, including fill/stroke colors, is left untouched; if a targeted update doesn\'t match any layer, it\'s listed in the response\'s unmatchedUpdates field instead of silently doing nothing. This is the tool to use for toggling overwriteFill/overwriteStroke on or off without losing a previously set color, or any other incremental tweak; use replace_logo_maker_state only when loading a complete logo from scratch. For a gradient icon set fillType: "linear" or "radial" with fillStops (and overwriteFill: true) rather than writing customSvg. For a non-square shape (a band, a bar, a stretched mark) set scaleY on the layer instead of composing several layers. For a two-tone or four-colour block background set background.type: "split" with splitLayout and gradientColors.',
+								'Smart partial editor updates: modifies background, applies authentic brand presets (e.g. "instagram", "facebook", "spotify", "stripe", "linear", "supabase"), toggles safe zone keylines, adds new layers, updates existing layers (by ID or 0-based index), removes layers, clears layers, randomizes the whole design, or updates selection without needing to re-send the whole state. updateLayers patches only the fields you send on the targeted layer: every other field, including fill/stroke colors, is left untouched; if a targeted update doesn\'t match any layer, it\'s listed in the response\'s unmatchedUpdates field instead of silently doing nothing, and an invalid enum value (e.g. fillType outside "solid"/"linear"/"radial", "gradient" is not a value) is reported in the response\'s fieldWarnings field instead of silently being dropped. This is the tool to use for toggling overwriteFill/overwriteStroke on or off without losing a previously set color, or any other incremental tweak; use replace_logo_maker_state only when loading a complete logo from scratch. For a gradient icon set fillType: "linear" or "radial" with fillStops (and overwriteFill: true) rather than writing customSvg. For a non-square shape (a band, a bar, a stretched mark) set scaleY on the layer instead of composing several layers. For a two-tone or four-colour block background set background.type: "split" with splitLayout and gradientColors. A centered layer\'s on-canvas footprint is roughly 200 * scale square; to stay inside the safe-zone circle (radius = canvasSize.width * safeZoneRatio / 2) a centered layer needs scale under (canvasSize.width * safeZoneRatio) / 283 (about 1.1 on the default 512px canvas at the default 0.611 ratio) — new layers default to scale 1.6, a bold full-bleed size that intentionally exceeds this, shrink it if safeZoneViolations flags it and a tight circular app-icon crop matters.',
 							inputSchema: updateLogoStateSchema,
 							async execute(args: Record<string, unknown> = {}) {
 								const current = stateRef.current;
@@ -1853,6 +1853,7 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 								// a batch update should stay non-fatal, but a no-op must be
 								// visible in the response.
 								const unmatchedUpdates: (string | number)[] = [];
+								const fieldWarnings: string[] = [];
 								if (
 									Array.isArray(args.updateLayers) &&
 									args.updateLayers.length > 0
@@ -1896,6 +1897,16 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 										}
 
 										if (foundIdx !== -1) {
+											if (
+												'fillType' in update &&
+												!['solid', 'linear', 'radial'].includes(
+													String(update.fillType),
+												)
+											) {
+												fieldWarnings.push(
+													`fillType "${update.fillType}" is not valid (must be "solid", "linear" or "radial"), ignored for layer ${targetId ?? targetIndex ?? updateIndex}`,
+												);
+											}
 											nextLayers[foundIdx] = patchLayer(
 												nextLayers[foundIdx],
 												update,
@@ -2012,6 +2023,8 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 									layerCount: nextLayers.length,
 									unmatchedUpdates:
 										unmatchedUpdates.length > 0 ? unmatchedUpdates : undefined,
+									fieldWarnings:
+										fieldWarnings.length > 0 ? fieldWarnings : undefined,
 									randomKeyword,
 									palette: randomPalette,
 									shareCode: code,
