@@ -2714,9 +2714,6 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 											canvasSize={canvasSize}
 										/>
 										<p className='text-[11px] text-muted-foreground'>
-											Copies a ready-to-paste prompt for your AI coding agent.
-										</p>
-										<p className='text-[11px] text-muted-foreground'>
 											Agent not finding these tools? Most browsers need WebMCP
 											enabled —{' '}
 											<a
