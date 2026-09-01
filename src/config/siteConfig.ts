@@ -1,1 +1,1 @@
-export const siteUrl = 'https://webmcp.allsvgicons.com';
+export const siteUrl = 'https://logo.allsvgicons.com';

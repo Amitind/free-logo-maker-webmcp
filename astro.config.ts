@@ -4,7 +4,7 @@ import { defineConfig } from 'astro/config';
 
 // https://astro.build/config
 export default defineConfig({
-	site: 'https://webmcp.allsvgicons.com',
+	site: 'https://logo.allsvgicons.com',
 	integrations: [react()],
 	vite: {
 		plugins: [tailwindcss()],

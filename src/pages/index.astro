@@ -9,10 +9,21 @@ import { LogoMaker } from '@/components/LogoMaker';
 	description="Free SVG logo editor with WebMCP tools an AI agent can drive directly, built for the OpenAI WebMCP Challenge."
 >
 	<WebMcp />
-	<main class="flex-1">
-		<LogoMaker client:load totalIconsLabel="200,000+" />
+	<nav class="shrink-0 border-b border-border px-4 py-2.5 flex items-center justify-between">
+		<span class="font-semibold text-sm">Free Logo Maker <span class="text-muted-foreground font-normal">— WebMCP demo</span></span>
+		<a
+			href="https://github.com/Amitind/free-logo-maker-webmcp"
+			target="_blank"
+			rel="noopener noreferrer"
+			class="text-sm text-muted-foreground hover:text-foreground transition-colors"
+		>
+			Source
+		</a>
+	</nav>
+	<main class="flex-1 min-h-0">
+		<LogoMaker client:only="react" totalIconsLabel="200,000+" />
 	</main>
-	<footer class="border-t border-border py-4 text-center text-sm text-muted-foreground">
+	<footer class="shrink-0 border-t border-border py-2 text-center text-sm text-muted-foreground">
 		<p>
 			Full version with more presets & guides &rarr;{' '}
 			<a

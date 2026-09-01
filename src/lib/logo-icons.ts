@@ -135,7 +135,7 @@ export function rankLogoIcons(icons: string[], limit = 6): string[] {
 	return spread;
 }
 
-export const ICON_API_URL = 'https://api.iconify.design';
+export const ICON_API_URL = 'https://i.allsvgicons.com';
 
 export function iconUrl(iconName: string): string {
 	const prefix = packOf(iconName);
