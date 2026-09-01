@@ -19,7 +19,7 @@ The page registers 7 dedicated Logo Maker tools (plus the global `send_feedback`
 
 1. **`get_logo_maker_state`**: Inspect the canvas dimensions, layers, background config, brand presets catalog, templates, safe-zone violations, and contrast warnings.
 2. **`update_logo_maker_state`**: Incrementally add, update, remove, or clear layers, tweak background styling, apply brand presets, or randomize styles.
-3. **`set_logo_maker_state`**: Replace the entire canvas state in a single call (all layers, background, and canvas size).
+3. **`replace_logo_maker_state`**: Replace the entire canvas state in a single call (all layers, background, and canvas size).
 4. **`search_logo_icons`**: Search across 200,000+ open-source SVG icons via Iconify with query keywords and pack filters.
 5. **`load_logo_maker_share`**: Load a logo design from an `asl1.` compressed share code, share URL, brand preset, or template ID.
 6. **`get_logo_preview`**: Render and export the current canvas as raw SVG vector markup or as a small PNG data URI.
