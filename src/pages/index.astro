@@ -5,35 +5,21 @@ import { LogoMaker } from '@/components/LogoMaker';
 ---
 
 <Layout
-	title="Free Logo Maker — WebMCP Demo"
+	title="Free Logo Maker — WebMCP-enabled SVG Editor"
 	description="Free SVG logo editor with WebMCP tools an AI agent can drive directly, built for the OpenAI WebMCP Challenge."
 >
 	<WebMcp />
-	<nav class="shrink-0 border-b border-border px-4 py-2.5 flex items-center justify-between">
-		<span class="font-semibold text-sm">Free Logo Maker <span class="text-muted-foreground font-normal">— WebMCP demo</span></span>
-		<a
-			href="https://github.com/Amitind/free-logo-maker-webmcp"
-			target="_blank"
-			rel="noopener noreferrer"
-			class="text-sm text-muted-foreground hover:text-foreground transition-colors"
-		>
-			Source
-		</a>
-	</nav>
 	<main class="flex-1 min-h-0">
 		<LogoMaker client:only="react" totalIconsLabel="200,000+" />
 	</main>
-	<footer class="shrink-0 border-t border-border py-2 text-center text-sm text-muted-foreground">
-		<p>
-			Full version with more presets & guides &rarr;{' '}
-			<a
-				href="https://allsvgicons.com/free-logo-maker/"
-				target="_blank"
-				rel="noopener noreferrer"
-				class="underline hover:text-foreground transition-colors"
-			>
-				allsvgicons.com/free-logo-maker/
-			</a>
-		</p>
+	<footer class="shrink-0 border-t border-border py-2 text-center">
+		<a
+			href="https://allsvgicons.com/free-logo-maker/"
+			target="_blank"
+			rel="noopener noreferrer"
+			class="inline-block text-sm font-semibold text-foreground hover:text-muted-foreground transition-colors"
+		>
+			<h1 class="text-sm font-semibold">Free logo maker</h1>
+		</a>
 	</footer>
 </Layout>

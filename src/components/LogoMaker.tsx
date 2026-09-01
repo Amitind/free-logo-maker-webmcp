@@ -1,5 +1,5 @@
 import {
-	Bot,
+	Copy,
 	Grid2x2,
 	Loader2,
 	PanelLeftClose,
@@ -18,10 +18,8 @@ import { RandomizeControl } from '@/components/logo-maker/RandomizeControl';
 import { RightSidebar } from '@/components/logo-maker/RightSidebar';
 import { TemplatesPanel } from '@/components/logo-maker/TemplatesPanel';
 import { logoTemplates } from '@/components/logo-maker/templates';
-import { WebMcpDebugPanel } from '@/components/logo-maker/WebMcpDebugPanel';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { siteUrl } from '@/config/siteConfig';
 import { copyLayerToClipboard, getClipboardLayer } from '@/lib/layer-clipboard';
 import {
 	buildCandidate,
@@ -94,9 +92,9 @@ declare global {
 
 const DEFAULT_CANVAS_SIZE = { width: 512, height: 512 };
 
-const AI_AGENT_STARTER_PROMPT = `I want a logo. Before you design anything, ask me a few short questions: the brand or product name, what it does, the mood (minimal, playful, bold, corporate), colors I like or must avoid, and any symbol I already have in mind.
+const buildAgentPrompt = (pageUrl: string) => `I want a logo. Before you design anything, ask me a few short questions: the brand or product name, what it does, the mood (minimal, playful, bold, corporate), colors I like or must avoid, and any symbol I already have in mind.
 
-Then open ${siteUrl}/ in the browser and use its WebMCP tools:
+Then open ${pageUrl} in the browser and use its WebMCP tools:
 1. Call get_logo_maker_state first. It returns the canvas, the brand presets and the layer fields.
 2. Search the icon library with search_logo_icons before drawing anything custom. Only fall back to customSvg when no icon fits.
 3. Build with update_logo_maker_state, then check safeZoneViolations and lowContrastLayers in the response and fix them.
@@ -2701,19 +2699,35 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 											className='w-full'
 											onClick={() =>
 												copyToClipboard(
-													AI_AGENT_STARTER_PROMPT,
+													buildAgentPrompt(window.location.href),
 													'Starter prompt copied, paste it into your coding agent',
 												)
 											}
 											data-track-click='logo_ai_agent_cta_click'
 										>
-											<Bot className='mr-2 h-4 w-4' />
+											<Copy className='mr-2 h-4 w-4' />
 											Let your AI agent design it
 										</Button>
+										<p className='text-[11px] text-muted-foreground'>
+											Copies a ready-to-paste prompt for your AI coding agent.
+										</p>
 										<RandomizeControl
 											onRandomize={handleRandomize}
 											canvasSize={canvasSize}
 										/>
+										<p className='text-[11px] text-muted-foreground'>
+											Agent not finding these tools? Most browsers need WebMCP
+											enabled —{' '}
+											<a
+												href='https://www.google.com/search?q=how+to+enable+webmcp+support+in+browser'
+												target='_blank'
+												rel='noopener noreferrer'
+												className='underline hover:text-foreground'
+											>
+												search how to enable it
+											</a>
+											.
+										</p>
 									</div>
 								</div>
 							</div>
@@ -2736,7 +2750,6 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 					/>
 				</div>
 			</div>
-			{import.meta.env.DEV && <WebMcpDebugPanel />}
 		</>
 	);
 }
