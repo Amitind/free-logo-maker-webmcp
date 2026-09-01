@@ -18,6 +18,7 @@ import { RandomizeControl } from '@/components/logo-maker/RandomizeControl';
 import { RightSidebar } from '@/components/logo-maker/RightSidebar';
 import { TemplatesPanel } from '@/components/logo-maker/TemplatesPanel';
 import { logoTemplates } from '@/components/logo-maker/templates';
+import { WebMcpDebugPanel } from '@/components/logo-maker/WebMcpDebugPanel';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { copyLayerToClipboard, getClipboardLayer } from '@/lib/layer-clipboard';
@@ -2708,13 +2709,13 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 											<Copy className='mr-2 h-4 w-4' />
 											Let your AI agent design it
 										</Button>
-										<p className='text-[11px] text-muted-foreground'>
-											Copies a ready-to-paste prompt for your AI coding agent.
-										</p>
 										<RandomizeControl
 											onRandomize={handleRandomize}
 											canvasSize={canvasSize}
 										/>
+										<p className='text-[11px] text-muted-foreground'>
+											Copies a ready-to-paste prompt for your AI coding agent.
+										</p>
 										<p className='text-[11px] text-muted-foreground'>
 											Agent not finding these tools? Most browsers need WebMCP
 											enabled —{' '}
@@ -2750,6 +2751,7 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 					/>
 				</div>
 			</div>
+			{import.meta.env.DEV && <WebMcpDebugPanel />}
 		</>
 	);
 }
