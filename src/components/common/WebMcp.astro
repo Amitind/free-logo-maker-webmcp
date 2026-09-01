@@ -26,9 +26,23 @@
 						},
 					};
 				},
-				async callTool(name, args) {
-					const tool = registeredTools.get(name);
-					if (!tool) {
+				// Matches native Chrome WebMCP's calling convention: getTools()
+				// resolves to {name, description, inputSchema}[] with inputSchema
+				// JSON-encoded, and executeTool(tool, argsJson) takes the tool
+				// object (not its name) plus a JSON-encoded args string, so agents
+				// get the same shape whether this polyfill or native is present.
+				async getTools() {
+					return Array.from(registeredTools.values()).map((t) => ({
+						name: t.definition.name,
+						title: t.definition.title,
+						description: t.definition.description,
+						inputSchema: JSON.stringify(t.definition.inputSchema || {}),
+					}));
+				},
+				async executeTool(tool, argsJson) {
+					const name = typeof tool === 'string' ? tool : tool && tool.name;
+					const entry = registeredTools.get(name);
+					if (!entry) {
 						throw new Error(
 							'Tool "' +
 								name +
@@ -36,10 +50,14 @@
 								Array.from(registeredTools.keys()).join(', '),
 						);
 					}
-					return await tool.execute(args);
-				},
-				getRegisteredTools() {
-					return Array.from(registeredTools.values()).map((t) => t.definition);
+					const args =
+						typeof argsJson === 'string'
+							? argsJson.trim()
+								? JSON.parse(argsJson)
+								: {}
+							: argsJson || {};
+					const result = await entry.execute(args);
+					return JSON.stringify(result);
 				},
 			};
 		}

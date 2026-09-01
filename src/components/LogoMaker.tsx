@@ -95,12 +95,22 @@ const DEFAULT_CANVAS_SIZE = { width: 512, height: 512 };
 
 const buildAgentPrompt = (pageUrl: string) => `I want a logo. Before you design anything, ask me a few short questions: the brand or product name, what it does, the mood (minimal, playful, bold, corporate), colors I like or must avoid, and any symbol I already have in mind.
 
-Then open ${pageUrl} in the browser. Find its WebMCP tools with document.modelContext.getRegisteredTools() and use them:
+Then open ${pageUrl} in the browser. Its WebMCP tools follow the standard document.modelContext API: registerTool, getTools() (async, resolves to an array of {name, description, inputSchema}, inputSchema is a JSON string, parse it), and executeTool(tool, argsJsonString) (first arg is the tool object from getTools(), not its name; second arg is a JSON string of the arguments, not an object; it resolves to a JSON string too). If you have a JS execution tool, run this once and reuse it for every call instead of guessing the calling convention yourself:
+const mc = document.modelContext;
+const tools = await mc.getTools();
+async function callTool(name, args) {
+  const tool = tools.find((t) => t.name === name);
+  const raw = await mc.executeTool(tool, JSON.stringify(args ?? {}));
+  return JSON.parse(raw);
+}
+If your runtime already discovers and calls document.modelContext tools natively, ignore the snippet above and just call the tools directly.
+
 1. Call get_logo_maker_state first. It returns the canvas, the brand presets and the layer fields.
 2. Search the icon library with search_logo_icons before drawing anything custom. Only fall back to customSvg when no icon fits.
-3. Build with update_logo_maker_state, then check safeZoneViolations and lowContrastLayers in the response and fix them.
+3. Build with update_logo_maker_state. Layer x/y are pixels on the canvas (0 to canvasSize.width/height, canvas center is canvasSize.width / 2), not a 0-100 percent scale; omit them to keep the default centered position. Then check safeZoneViolations and lowContrastLayers in the response and fix them.
 4. Make three clearly different variants (different symbol, shape or palette, not the same logo recoloured). After each one, preview it with get_logo_preview (format: "svg") and save it as a checkpoint with manage_saved_logos (action: "save") so I can click between them in the My logos panel.
 5. Tell me which variant you would pick and why, with the shareUrl from get_logo_maker_state for each.
+6. Before you finish, call send_feedback once with one or two sentences on anything you had to guess, retry, or found confusing while driving these tools, and what would have made it clearer. Skip it only if nothing tripped you up.
 
 Avoid generic choices unless I ask for them: no rocket, lightning bolt, brain, sparkles, infinity loop or abstract swoosh, no purple-to-blue gradient, one strong idea instead of a busy composition.`;
 
@@ -1663,7 +1673,7 @@ export function LogoMaker({ totalIconsLabel }: LogoMakerProps) {
 							name: 'get_logo_maker_state',
 							title: 'Get logo maker state',
 							description:
-								'Start here. Before designing, ask the human what they want: brand or product name, preferred colors, style (minimal, playful, bold, corporate), and any icon or symbol in mind. Do not guess these from nothing, and do not interrogate with a long fixed questionnaire either, just enough to design with intent. Then call this tool to read the current logo-maker canvas size, background, layers (with IDs and indices), selected layer, safe zone settings, available brands list, safeZoneViolations, lowContrastLayers, share code, and share URL. Each layer includes a computed bounds field (width, height, left, top, right, bottom, centerX, centerY, rotation, all in canvas pixels) so you can check overlap or alignment against other layers or the canvas edges without guessing from x/y/scale. Pass includeSvg: true to also receive the rendered SVG string, includeBrands: true for the full brand presets catalog (optionally narrowed with brandsQuery/brandsCategory), or includeTemplates: true for the built-in templates catalog.',
+								'Start here. Before designing, ask the human what they want: brand or product name, preferred colors, style (minimal, playful, bold, corporate), and any icon or symbol in mind. Do not guess these from nothing, and do not interrogate with a long fixed questionnaire either, just enough to design with intent. Then call this tool to read the current logo-maker canvas size, background, layers (with IDs and indices), selected layer, safe zone settings, available brands list, safeZoneViolations, lowContrastLayers (checked against the flat canvas background only, not other layers stacked underneath, so a low-contrast reading on a layer deliberately used as a cutout/notch against another layer is expected and can be ignored), share code, and share URL. Each layer includes a computed bounds field (width, height, left, top, right, bottom, centerX, centerY, rotation, all in canvas pixels) so you can check overlap or alignment against other layers or the canvas edges without guessing from x/y/scale. Pass includeSvg: true to also receive the rendered SVG string, includeBrands: true for the full brand presets catalog (optionally narrowed with brandsQuery/brandsCategory), or includeTemplates: true for the built-in templates catalog.',
 							annotations: { readOnlyHint: true },
 							inputSchema: getLogoStateSchema,
 							async execute(args: Record<string, unknown> = {}) {
